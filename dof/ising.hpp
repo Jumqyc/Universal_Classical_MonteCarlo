@@ -17,6 +17,12 @@ struct IsingDof
 
 static_assert(Dof<IsingDof>);
 
+/// The local bilinear s_i s_j used by Ising pair terms.
+[[nodiscard]] inline std::int32_t dot(IsingSpin a, IsingSpin b) noexcept
+{
+    return static_cast<std::int32_t>(a) * static_cast<std::int32_t>(b);
+}
+
 /// Symmetric Ising proposal: flip the sign.
 struct Flip
 {

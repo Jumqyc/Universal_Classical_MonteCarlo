@@ -20,6 +20,16 @@ struct VectorDof
 
 static_assert(Dof<VectorDof<3>>);
 
+/// Dot product of two N-component vectors.
+template <std::size_t N>
+[[nodiscard]] double dot(const double* a, const double* b) noexcept
+{
+    static_assert(N >= 1, "dot needs at least one component");
+    double s = 0.0;
+    for (std::size_t k = 0; k < N; ++k) s += a[k] * b[k];
+    return s;
+}
+
 /// Uniform proposal on S^(N-1), N >= 1. Samples a uniform height, then a
 /// uniform direction on the remaining sphere; the result is exactly uniform.
 template <std::size_t N, class T = double>
@@ -78,11 +88,11 @@ struct LocalRotation
         const T eps = T(64) * std::numeric_limits<T>::epsilon();
         for (;;) {
             UniformSphereN<N, T>{}.sample(nullptr, rng, v.data());
-            T dot = 0;
-            for (std::size_t k = 0; k < N; ++k) dot += v[k] * u[k];
+            T proj = 0;
+            for (std::size_t k = 0; k < N; ++k) proj += v[k] * u[k];
             T r2 = 0;
             for (std::size_t k = 0; k < N; ++k) {
-                v[k] -= dot * u[k];
+                v[k] -= proj * u[k];
                 r2 += v[k] * v[k];
             }
             if (r2 > eps) {

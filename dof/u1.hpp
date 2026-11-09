@@ -15,6 +15,12 @@ struct U1Link
     static constexpr U1Link identity() noexcept { return {}; }
 };
 
+/// Oriented plaquette cos: cos(theta0 + theta1 - theta2 - theta3).
+[[nodiscard]] inline double plaquette(double t0, double t1, double t2, double t3) noexcept
+{
+    return std::cos(t0 + t1 - t2 - t3);
+}
+
 /// Representation of one U(1) link degree of freedom.
 struct U1Dof
 {

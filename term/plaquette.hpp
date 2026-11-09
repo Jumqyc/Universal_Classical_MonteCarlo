@@ -1,11 +1,11 @@
 #pragma once
 
+#include <array>
 #include <cassert>
-#include <cmath>
 #include <cstddef>
 
-#include <term/cell.hpp>
 #include <dof/u1.hpp>
+#include <term/cell.hpp>
 
 /// U(1) plaquette interaction. The four links are ordered so that the oriented
 /// plaquette angle is theta0 + theta1 - theta2 - theta3; the lattice builder is
@@ -27,42 +27,23 @@ struct U1PlaquetteTerm
     /// cos of the oriented plaquette angle, useful for the mean plaquette.
     double cos_plaquette(const dtype* const* links) const noexcept
     {
-        return std::cos(angle(links));
+        return plaquette(links[0]->theta, links[1]->theta, links[2]->theta,
+                         links[3]->theta);
     }
 
     /// Energy change when links[which] changes from old to nw; other links are
     /// read from links.
-    energy_type delta(std::size_t which,
-                      const dtype* old,
-                      const dtype* nw,
+    energy_type delta(std::size_t which, const dtype* /*old*/, const dtype* nw,
                       const dtype* const* links) const noexcept
     {
         assert(which < arity);
-        const double before = angle_with(links, which, old);
-        const double after = before + sign(which) * (nw->theta - old->theta);
-        return beta * (std::cos(before) - std::cos(after));
-    }
-
-private:
-    static constexpr int sign(std::size_t which) noexcept
-    {
-        return which < 2 ? 1 : -1;
-    }
-
-    static double angle_with(const dtype* const* links, std::size_t which,
-                             const dtype* value) noexcept
-    {
-        double theta = 0.0;
-        for (std::size_t k = 0; k < arity; ++k)
-            theta += sign(k) * (k == which ? value->theta : links[k]->theta);
-        return theta;
-    }
-
-    static double angle(const dtype* const* links) noexcept
-    {
-        double theta = 0.0;
-        for (std::size_t k = 0; k < arity; ++k) theta += sign(k) * links[k]->theta;
-        return theta;
+        std::array<const dtype*, arity> p{links[0], links[1], links[2], links[3]};
+        p[which] = nw;
+        const double before = plaquette(links[0]->theta, links[1]->theta,
+                                        links[2]->theta, links[3]->theta);
+        const double after = plaquette(p[0]->theta, p[1]->theta, p[2]->theta,
+                                       p[3]->theta);
+        return beta * (before - after);
     }
 };
 

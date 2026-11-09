@@ -20,7 +20,7 @@ struct IsingTerm
     /// Pair energy of the two endpoint states, links[0] and links[1].
     energy_type energy(const dtype* const* links) const noexcept
     {
-        return -J * energy_type(*links[0]) * energy_type(*links[1]);
+        return -J * dot(*links[0], *links[1]);
     }
 
     /// Energy change when links[which] goes from old to nw; the other is fixed.
@@ -29,7 +29,7 @@ struct IsingTerm
     {
         assert(which < arity);
         const dtype* fixed = links[which == 0 ? 1 : 0];
-        return -J * (energy_type(*nw) - energy_type(*old)) * energy_type(*fixed);
+        return -J * (dot(*nw, *fixed) - dot(*old, *fixed));
     }
 };
 

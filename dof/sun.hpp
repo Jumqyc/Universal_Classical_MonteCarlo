@@ -75,6 +75,14 @@ struct SULink
     }
 };
 
+/// Re Tr(U0 U1 U2^dagger U3^dagger) / N, the oriented plaquette observable.
+template <std::size_t N>
+[[nodiscard]] double plaquette(const SULink<N>& u0, const SULink<N>& u1,
+                               const SULink<N>& u2, const SULink<N>& u3) noexcept
+{
+    return (u0 * u1 * u2.dagger() * u3.dagger()).real_trace() / static_cast<double>(N);
+}
+
 namespace sun_detail
 {
 template <std::size_t N>

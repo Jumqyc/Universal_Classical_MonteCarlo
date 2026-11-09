@@ -2,46 +2,84 @@
 
 #include <array>
 #include <cstddef>
+#include <vector>
 
+#include <dof/u1.hpp>
 #include <lattice/cell_complex.hpp>
 #include <lattice/hypercubic.hpp>
-#include <model/cell.hpp>
-#include <term/plaquette.hpp>
 
 /// Pure U(1) lattice gauge theory on a periodic four-dimensional lattice.
 ///
-/// Every link is one site. The model is a CellModel whose cells are the
-/// plaquettes: CellComplex supplies which four links form each plaquette and which
-/// plaquettes contain a given link, and U1PlaquetteTerm supplies the Wilson
-/// energy. The action is
-///   S = beta * sum_p (1 - cos theta_p).
+/// The table supplies the four links of every plaquette; the action is written
+/// directly with the local plaquette primitive:
+///   S = beta * sum_p (1 - cos(theta_p)).
 class U1Gauge
-    : public CellModel<U1Dof, U1PlaquetteTerm, CellComplex<4>>
 {
-    using Base = CellModel<U1Dof, U1PlaquetteTerm, CellComplex<4>>;
-
 public:
+    using value_type = U1Link;
+    static constexpr std::size_t size = 1;
+
     /// L is the extent in every direction; beta is the inverse coupling.
     explicit U1Gauge(std::size_t L, double beta = 1.0)
-        : Base(hypercubic_plaquettes(L), U1PlaquetteTerm{beta}), L_(L)
+        : cells_(hypercubic_plaquettes(L)), beta_(beta), L_(L),
+          links_(cells_.sites())
     {}
 
-    /// Linear extent; all four directions have the same length.
+    std::size_t sites() const noexcept { return links_.size(); }
+    std::size_t cells() const noexcept { return cells_.cells(); }
     std::size_t length() const noexcept { return L_; }
+
+    const U1Link* data() const noexcept { return links_.data(); }
+    U1Link* data() noexcept { return links_.data(); }
+
+    /// Energy change when link i takes p, all other links fixed.
+    double energy_diff_at(std::size_t i, const U1Link* p) const noexcept
+    {
+        double d = 0.0;
+        for (const auto inc : cells_.incident(i)) {
+            const auto s = cells_.cell(inc.cell);
+            std::array<const U1Link*, 4> links{
+                links_.data() + s[0], links_.data() + s[1],
+                links_.data() + s[2], links_.data() + s[3]};
+            const double before = plaquette(links[0]->theta, links[1]->theta,
+                                            links[2]->theta, links[3]->theta);
+            links[inc.which] = p;
+            const double after = plaquette(links[0]->theta, links[1]->theta,
+                                           links[2]->theta, links[3]->theta);
+            d += beta_ * (before - after);
+        }
+        return d;
+    }
+
+    void update(std::size_t i, const U1Link* p) noexcept { links_[i] = *p; }
+
+    /// Full Wilson action, useful for finite-difference checks.
+    double total_energy() const noexcept
+    {
+        double e = 0.0;
+        for (std::size_t c = 0; c < cells_.cells(); ++c)
+            e += beta_ * (1.0 - plaquette_at(c));
+        return e;
+    }
 
     /// Mean of cos(theta_p) over all 6*L^4 plaquettes.
     double mean_plaquette() const noexcept
     {
         double sum = 0.0;
-        for (std::size_t c = 0; c < this->cells(); ++c) {
-            const auto sites = this->cell_sites(c);
-            std::array<const U1Link*, 4> links{};
-            for (std::size_t k = 0; k < 4; ++k) links[k] = this->data() + sites[k];
-            sum += this->term().cos_plaquette(links.data());
-        }
-        return sum / static_cast<double>(this->cells());
+        for (std::size_t c = 0; c < cells_.cells(); ++c) sum += plaquette_at(c);
+        return sum / static_cast<double>(cells_.cells());
     }
 
 private:
+    double plaquette_at(std::size_t c) const noexcept
+    {
+        const auto s = cells_.cell(c);
+        return plaquette(links_[s[0]].theta, links_[s[1]].theta,
+                         links_[s[2]].theta, links_[s[3]].theta);
+    }
+
+    CellComplex<4> cells_;
+    double beta_;
     std::size_t L_;
+    std::vector<U1Link> links_;
 };

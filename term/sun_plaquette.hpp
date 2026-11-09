@@ -24,7 +24,7 @@ struct SUPlaquetteTerm
     /// Re Tr(U_p) / N, the plaquette observable.
     double real_plaquette(const dtype* const* links) const noexcept
     {
-        return plaquette(links, arity, nullptr).real_trace() / static_cast<double>(N);
+        return plaquette(*links[0], *links[1], *links[2], *links[3]);
     }
 
     energy_type energy(const dtype* const* links) const noexcept
@@ -38,19 +38,11 @@ struct SUPlaquetteTerm
                       const dtype* const* links) const noexcept
     {
         assert(which < arity);
-        const double before = plaquette(links, arity, nullptr).real_trace();
-        const double after = plaquette(links, which, nw).real_trace();
-        return beta * (before - after) / static_cast<double>(N);
-    }
-
-private:
-    /// U0 U1 U2^dagger U3^dagger, with links[which] optionally replaced by value.
-    static dtype plaquette(const dtype* const* links, std::size_t which,
-                           const dtype* value) noexcept
-    {
         std::array<const dtype*, arity> p{links[0], links[1], links[2], links[3]};
-        if (which < arity) p[which] = value;
-        return (*p[0]) * (*p[1]) * p[2]->dagger() * p[3]->dagger();
+        p[which] = nw;
+        const double before = plaquette(*links[0], *links[1], *links[2], *links[3]);
+        const double after = plaquette(*p[0], *p[1], *p[2], *p[3]);
+        return beta * (before - after);
     }
 };
 
