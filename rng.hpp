@@ -4,14 +4,7 @@
 
 /// PCG-XSH-RR 32-bit generator (O'Neill, "PCG: A Family of Simple Fast Space-
 /// Efficient Statistically Good Algorithms for Random Number Generation", 2014).
-/// A 64-bit LCG state and a 32-bit permuted output; the two-word state is
-/// trivially copyable, so the engine survives a move into a driver and can be
-/// copied to a device unchanged.
-///
-/// Deterministic: equal (seed, stream) gives the same sequence. Different
-/// streams give sequences that are independent over the full 2^64 period, so
-/// parallel chains should vary the stream rather than adding a constant to the
-/// seed (seeds that differ by small amounts start from nearby states).
+
 class Pcg32
 {
 public:

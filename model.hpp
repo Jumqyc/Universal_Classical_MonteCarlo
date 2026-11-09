@@ -65,20 +65,18 @@ private:
 /// compile time: the model stays a plain struct with no table pointer, so the
 /// same definition can be copied to a device and driven by a kernel, and a
 /// missing member is a compile error rather than a run-time surprise.
+/// Measurement is not part of this concept: order parameters are computed by
+/// the caller from data(), and an energy sum is an optional EnergyModel.
 template <class M>
 concept ModelLike = requires(const M cm,
                             M m,
                             std::size_t loc,
                             const typename M::value_type* proposal) {
     typename M::value_type;
-    { M::dof } -> std::convertible_to<std::size_t>;
+    { M::size } -> std::convertible_to<std::size_t>;
 
     { cm.sites() } -> std::convertible_to<std::size_t>;
     { cm.data() }  -> std::convertible_to<const typename M::value_type*>;
-
-    /// Total energy of one site, and its contribution to the order parameter.
-    { cm.energy_at(loc) }      -> std::convertible_to<double>;
-    { cm.order_param_at(loc) } -> std::convertible_to<typename M::value_type>;
 
     /// Energy change when loc takes proposal, all other sites fixed.
     { cm.energy_diff_at(loc, proposal) } -> std::convertible_to<double>;
@@ -87,18 +85,9 @@ concept ModelLike = requires(const M cm,
     { m.update(loc, proposal) } -> std::same_as<void>;
 };
 
-/// What a cluster updater additionally needs: the bonds of one site and the
-/// energy change of a single bond. The payload lives in the bond, so the model
-/// never has to look a coupling up by its two endpoints.
+/// Optional measurement interface: a site energy that can be summed. The
+/// updaters do not require it; it only enables energy observables.
 template <class M>
-concept BondModelLike = ModelLike<M> && requires(const M cm,
-                                                std::size_t loc,
-                                                const typename M::value_type* proposal,
-                                                const typename M::bond_type& bond) {
-    typename M::bond_type;
-    { cm.degree(loc) } -> std::convertible_to<std::size_t>;
-    { cm.bonds(loc) }  -> std::convertible_to<const typename M::bond_type*>;
-
-    /// Energy change of the bond when bond.j takes proposal, loc fixed.
-    { cm.energy_diff_bond(loc, bond, proposal) } -> std::convertible_to<double>;
+concept EnergyModel = ModelLike<M> && requires(const M cm, std::size_t loc) {
+    { cm.energy_at(loc) } -> std::convertible_to<double>;
 };

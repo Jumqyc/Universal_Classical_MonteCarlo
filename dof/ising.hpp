@@ -1,9 +1,21 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
+
+#include <dof/dof.hpp>
 
 /// Ising degree of freedom: one sign per site, stored as int8_t.
 using IsingSpin = std::int8_t;
+
+/// Representation of the Ising degree of freedom.
+struct IsingDof
+{
+    using dtype = IsingSpin;
+    static constexpr std::size_t size = 1;
+};
+
+static_assert(Dof<IsingDof>);
 
 /// Symmetric Ising proposal: flip the sign.
 struct Flip

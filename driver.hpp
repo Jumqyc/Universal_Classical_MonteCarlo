@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <concepts>
 #include <cstddef>
 #include <memory>
 #include <utility>
@@ -28,10 +29,10 @@ public:
     void sweep()
     {
         using T = typename M::value_type;
-        std::array<T, M::dof> candidate;
+        std::array<T, M::size> candidate;
 
         for (std::size_t i = 0; i < model_.sites(); ++i) {
-            const T* current = model_.data() + i * M::dof;
+            const T* current = model_.data() + i * M::size;
             proposal_.sample(current, rng_, candidate.data());
 
             const double dE    = model_.energy_diff_at(i, candidate.data());
@@ -47,11 +48,39 @@ public:
         for (std::size_t k = 0; k < sweeps; ++k) sweep();
     }
 
+    /// Runs n sweeps and calls observe(model) after each one. The callback is
+    /// the measurement hook: it receives const access and decides what to
+    /// record.
+    template <class F>
+    void sample(std::size_t sweeps, F&& observe)
+    {
+        for (std::size_t k = 0; k < sweeps; ++k) {
+            sweep();
+            observe(std::as_const(model_));
+        }
+    }
+
 private:
     M&     model_;
     Q      proposal_;
     R      rng_;
     double beta_;
+};
+
+/// What Wolff additionally needs: one row of bonds per site and the energy
+/// change of a single bond. Only Wolff requires this, so the base model
+/// interface stays free of bond storage.
+template <class M>
+concept WolffModel = ModelLike<M> && requires(const M cm,
+                                             std::size_t loc,
+                                             const typename M::value_type* proposal,
+                                             const typename M::bond_type& bond) {
+    typename M::bond_type;
+    { cm.degree(loc) } -> std::convertible_to<std::size_t>;
+    { cm.bonds(loc) }  -> std::convertible_to<const typename M::bond_type*>;
+
+    /// Energy change of the bond when bond.j takes proposal, loc fixed.
+    { cm.energy_diff_bond(loc, bond, proposal) } -> std::convertible_to<double>;
 };
 
 /// Drives one Wolff chain. Owns the two arrays the growth needs, so no
@@ -60,7 +89,7 @@ private:
 /// energy under one common reflection, which is what makes the flip
 /// rejection-free; a field term or any non-pair term breaks that. The model
 /// must expose one row of bonds per site through degree()/bonds().
-template <BondModelLike M, class A, class R>
+template <WolffModel M, class A, class R>
 class Wolff
 {
 public:
@@ -75,7 +104,7 @@ public:
     std::size_t flip()
     {
         using T = typename M::value_type;
-        static constexpr std::size_t D = M::dof;
+        static constexpr std::size_t D = M::size;
 
         std::array<T, D> r;
         axis_.sample(nullptr, rng_, r.data());
@@ -133,9 +162,10 @@ public:
     }
 
     /// Flips clusters until the flipped sites add up to one lattice, i.e. until
-    /// every site has been touched about once. Meant for the critical region:
-    /// far above it the clusters are single sites and this costs one buffer
-    /// clear per site.
+    /// every site has been touched about once. Meant for equilibration: far
+    /// above the critical region the clusters are single sites and this costs
+    /// one buffer clear per site, and a sweep-boundary estimator is biased.
+    /// Use sample() for measurements.
     void sweep()
     {
         std::size_t touched = 0;
@@ -146,6 +176,17 @@ public:
     void run(std::size_t sweeps)
     {
         for (std::size_t k = 0; k < sweeps; ++k) sweep();
+    }
+
+    /// Flips n clusters and calls observe(model) after each flip. This is the
+    /// unbiased sampling entry point; the callback decides what to record.
+    template <class F>
+    void sample(std::size_t flips, F&& observe)
+    {
+        for (std::size_t k = 0; k < flips; ++k) {
+            flip();
+            observe(std::as_const(model_));
+        }
     }
 
     /// Mean cluster size over every flip so far, in sites.
