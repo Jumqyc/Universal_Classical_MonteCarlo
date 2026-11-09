@@ -58,8 +58,9 @@ private:
 /// workspace type is exposed and a call site only says how many flips it wants.
 /// Requires a bond-only Hamiltonian: the cluster's internal bonds keep their
 /// energy under one common reflection, which is what makes the flip
-/// rejection-free; a field term or any non-pair term breaks that.
-template <ModelLike M, class A, class R>
+/// rejection-free; a field term or any non-pair term breaks that. The model
+/// must expose one row of bonds per site through degree()/bonds().
+template <BondModelLike M, class A, class R>
 class Wolff
 {
 public:
@@ -89,7 +90,6 @@ public:
 
         std::array<T, D> prop;   // reflected value of the site being grown from
         std::array<T, D> nb;     // reflected value of a candidate neighbour
-        std::array<std::size_t, M::max_neighbors> nbrs;
 
         std::size_t cluster = 0;
         while (top > 0) {
@@ -101,12 +101,14 @@ public:
             for (std::size_t k = 0; k < D; ++k) dot += s[k] * r[k];
             for (std::size_t k = 0; k < D; ++k) prop[k] = s[k] - T(2) * dot * r[k];
 
-            // Explore before writing i back: energy_diff_between reads the
+            // Explore before writing i back: energy_diff_bond reads the
             // lattice, and the growth test needs the bond before either end
             // flips.
-            const std::size_t deg = model_.neighbors(i, nbrs.data());
+            const auto* bonds = model_.bonds(i);
+            const std::size_t deg = model_.degree(i);
             for (std::size_t a = 0; a < deg; ++a) {
-                const std::size_t j = nbrs[a];
+                const auto& bond = bonds[a];
+                const std::size_t j = static_cast<std::size_t>(bond.j);
                 if (in_cluster_[j]) continue;
 
                 const T* t = model_.data() + j * D;
@@ -116,7 +118,7 @@ public:
 
                 // p = 1 - exp(-beta*dE), clamped from below at 0: a negative
                 // dE gives a negative p and rng.uni() is never negative.
-                const double dE = model_.energy_diff_between(j, i, nb.data());
+                const double dE = model_.energy_diff_bond(i, bond, nb.data());
                 if (rng_.uni() < 1.0 - std::exp(-beta_ * dE)) {
                     in_cluster_[j] = 1;
                     stack_[top++]  = j;
