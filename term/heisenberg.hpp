@@ -1,10 +1,13 @@
 #pragma once
 
+#include <cassert>
 #include <cstddef>
 
 #include <dof/vector.hpp>
+#include <term/cell.hpp>
 
-/// Uniform N-component Heisenberg pair interaction: E = -J S_i . S_j.
+/// Uniform N-component Heisenberg pair interaction: E = -J S_i . S_j. A pair is
+/// a cell of arity 2, so this satisfies CellTerm.
 template <std::size_t N>
 struct HeisenbergTerm
 {
@@ -14,19 +17,24 @@ struct HeisenbergTerm
 
     double J = 1.0;
 
-    /// Pair energy of the two endpoint states.
-    energy_type energy(const dtype* a, const dtype* b) const noexcept
+    /// Pair energy of links[0] . links[1].
+    energy_type energy(const dtype* const* links) const noexcept
     {
         energy_type dot = 0.0;
-        for (std::size_t k = 0; k < N; ++k) dot += a[k] * b[k];
+        for (std::size_t k = 0; k < N; ++k) dot += links[0][k] * links[1][k];
         return -J * dot;
     }
 
-    /// Energy change when one endpoint goes from old to nw; fixed is the other.
-    energy_type delta(const dtype* old, const dtype* nw, const dtype* fixed) const noexcept
+    /// Energy change when links[which] goes from old to nw; the other is fixed.
+    energy_type delta(std::size_t which, const dtype* old, const dtype* nw,
+                      const dtype* const* links) const noexcept
     {
+        assert(which < arity);
+        const dtype* fixed = links[which == 0 ? 1 : 0];
         energy_type d = 0.0;
         for (std::size_t k = 0; k < N; ++k) d += (nw[k] - old[k]) * fixed[k];
         return -J * d;
     }
 };
+
+static_assert(CellTerm<HeisenbergTerm<3>, VectorDof<3>>);

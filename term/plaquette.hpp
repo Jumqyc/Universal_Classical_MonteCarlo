@@ -4,7 +4,7 @@
 #include <cmath>
 #include <cstddef>
 
-#include <term/cell_term.hpp>
+#include <term/cell.hpp>
 #include <dof/u1.hpp>
 
 /// U(1) plaquette interaction. The four links are ordered so that the oriented

@@ -7,12 +7,12 @@
 #include <stdexcept>
 #include <vector>
 
-#include <lattice/cell_list.hpp>
+#include <lattice/cell_complex.hpp>
 
 /// Periodic four-dimensional hypercubic lattice. Sites are oriented links,
 /// indexed mu*L^4 + linear(c); cells are the 6*L^4 plaquettes, ordered so the
 /// oriented angle is theta_mu(c) + theta_nu(c+e_mu) - theta_mu(c+e_nu) - theta_nu(c).
-[[nodiscard]] inline CellList<4> hypercubic_plaquettes(std::size_t L)
+[[nodiscard]] inline CellComplex<4> hypercubic_plaquettes(std::size_t L)
 {
     constexpr std::size_t max = std::numeric_limits<std::size_t>::max();
     if (L == 0)
@@ -60,5 +60,5 @@
                                 static_cast<std::uint32_t>(index(nu, c))}});
                         }
 
-    return CellList<4>(sites, cells);
+    return CellComplex<4>(sites, cells);
 }

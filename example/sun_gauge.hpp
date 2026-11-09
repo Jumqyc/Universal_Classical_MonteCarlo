@@ -4,10 +4,10 @@
 #include <cstddef>
 
 #include <dof/sun.hpp>
-#include <lattice/cell_list.hpp>
+#include <lattice/cell_complex.hpp>
 #include <lattice/hypercubic.hpp>
-#include <term/cell_model.hpp>
-#include <term/sun_plaquette_term.hpp>
+#include <model/cell.hpp>
+#include <term/sun_plaquette.hpp>
 
 /// Pure SU(N) lattice gauge theory on a periodic four-dimensional lattice.
 ///
@@ -16,9 +16,9 @@
 ///   S = beta * sum_p (1 - Re Tr(U_p) / N).
 template <std::size_t N>
 class SUGauge
-    : public CellModel<SUDof<N>, SUPlaquetteTerm<N>, CellList<4>>
+    : public CellModel<SUDof<N>, SUPlaquetteTerm<N>, CellComplex<4>>
 {
-    using Base = CellModel<SUDof<N>, SUPlaquetteTerm<N>, CellList<4>>;
+    using Base = CellModel<SUDof<N>, SUPlaquetteTerm<N>, CellComplex<4>>;
 
 public:
     /// L is the extent in every direction; beta is the inverse coupling.

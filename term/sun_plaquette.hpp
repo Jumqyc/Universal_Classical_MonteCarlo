@@ -5,7 +5,7 @@
 #include <cstddef>
 
 #include <dof/sun.hpp>
-#include <term/cell_term.hpp>
+#include <term/cell.hpp>
 
 /// SU(N) plaquette interaction. Links are ordered as U0 U1 U2^dagger U3^dagger;
 /// the lattice builder is responsible for that order. The energy is

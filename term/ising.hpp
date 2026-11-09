@@ -1,11 +1,14 @@
 #pragma once
 
+#include <cassert>
 #include <cstddef>
 #include <cstdint>
 
 #include <dof/ising.hpp>
+#include <term/cell.hpp>
 
-/// Uniform Ising pair interaction: E = -J s_i s_j.
+/// Uniform Ising pair interaction: E = -J s_i s_j. A pair is a cell of arity 2,
+/// so this satisfies CellTerm rather than a separate pair concept.
 struct IsingTerm
 {
     using dtype = IsingDof::dtype;
@@ -14,15 +17,20 @@ struct IsingTerm
 
     energy_type J = 1;
 
-    /// Pair energy of the two endpoint states.
-    energy_type energy(const dtype* a, const dtype* b) const noexcept
+    /// Pair energy of the two endpoint states, links[0] and links[1].
+    energy_type energy(const dtype* const* links) const noexcept
     {
-        return -J * energy_type(*a) * energy_type(*b);
+        return -J * energy_type(*links[0]) * energy_type(*links[1]);
     }
 
-    /// Energy change when one endpoint goes from old to nw; fixed is the other.
-    energy_type delta(const dtype* old, const dtype* nw, const dtype* fixed) const noexcept
+    /// Energy change when links[which] goes from old to nw; the other is fixed.
+    energy_type delta(std::size_t which, const dtype* old, const dtype* nw,
+                      const dtype* const* links) const noexcept
     {
+        assert(which < arity);
+        const dtype* fixed = links[which == 0 ? 1 : 0];
         return -J * (energy_type(*nw) - energy_type(*old)) * energy_type(*fixed);
     }
 };
+
+static_assert(CellTerm<IsingTerm, IsingDof>);

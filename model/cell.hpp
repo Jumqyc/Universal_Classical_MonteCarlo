@@ -9,25 +9,14 @@
 #include <vector>
 
 #include <dof/dof.hpp>
-#include <term/cell_term.hpp>
+#include <lattice/cell_complex.hpp>
+#include <term/cell.hpp>
 
-/// A cell collection that exposes, for every site, the cells containing it and
-/// the site's position in each cell. CellList satisfies it.
-template <class L>
-concept CellListLike = requires(const L list, std::size_t i, std::size_t c) {
-    { L::arity } -> std::convertible_to<std::size_t>;
-    { list.sites() } -> std::convertible_to<std::size_t>;
-    { list.cells() } -> std::convertible_to<std::size_t>;
-    { list.cell(c) } -> std::convertible_to<std::span<const std::uint32_t, L::arity>>;
-    { list.incident(i) } -> std::convertible_to<std::span<const typename L::Incident>>;
-};
-
-/// A model with one cell interaction per cell. The state is AoS; the cell list
-/// supplies geometry and incidence, the term supplies the local energy. There
-/// is deliberately no per-site energy: a plaquette energy belongs to the cell,
-/// not to one link.
+/// A model with one cell interaction per cell.
 template <class D, class Term, class List>
-    requires Dof<D> && CellTerm<Term, D> && CellListLike<List> &&
+    requires Dof<D> &&
+            CellTerm<Term, D> &&
+            CellComplexLike<List> &&
              (Term::arity == List::arity)
 class CellModel
 {

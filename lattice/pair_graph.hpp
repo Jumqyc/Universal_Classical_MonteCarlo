@@ -1,5 +1,6 @@
 #pragma once
 
+#include <concepts>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
@@ -26,7 +27,7 @@ struct Bond
 /// physically distinct, and the energy must count each one. P must be default
 /// constructible and copyable; indices are uint32_t, so N and 2E must fit.
 template <class P = NoPayload>
-class CsrGraph
+class PairGraph
 {
 public:
     using bond_type = Bond<P>;
@@ -39,23 +40,23 @@ public:
         P c{};
     };
 
-    CsrGraph() = default;
+    PairGraph() = default;
 
     /// Builds from n sites and an edge list. symmetric=true adds (j in row i)
     /// and (i in row j). Throws std::out_of_range for an endpoint >= n,
     /// std::invalid_argument for a self-loop, and std::overflow_error if n or
     /// the stored bond count exceeds uint32_t.
-    CsrGraph(std::size_t n, std::span<const Edge> edges, bool symmetric = true)
+    PairGraph(std::size_t n, std::span<const Edge> edges, bool symmetric = true)
     {
         if (n > std::numeric_limits<std::uint32_t>::max())
-            throw std::overflow_error("CsrGraph: site count exceeds uint32_t");
+            throw std::overflow_error("PairGraph: site count exceeds uint32_t");
 
         std::vector<std::size_t> degree(n, 0);
         for (const Edge& e : edges) {
             if (e.i >= n || e.j >= n)
-                throw std::out_of_range("CsrGraph: edge endpoint out of range");
+                throw std::out_of_range("PairGraph: edge endpoint out of range");
             if (e.i == e.j)
-                throw std::invalid_argument("CsrGraph: self-loop");
+                throw std::invalid_argument("PairGraph: self-loop");
             ++degree[e.i];
             if (symmetric) ++degree[e.j];
         }
@@ -66,7 +67,7 @@ public:
             offset[i] = static_cast<std::uint32_t>(total);
             total += degree[i];
             if (total > std::numeric_limits<std::uint32_t>::max())
-                throw std::overflow_error("CsrGraph: bond count exceeds uint32_t");
+                throw std::overflow_error("PairGraph: bond count exceeds uint32_t");
         }
         offset[n] = static_cast<std::uint32_t>(total);
 
@@ -103,4 +104,13 @@ public:
 private:
     std::vector<std::uint32_t> offset_;
     std::vector<bond_type>     bonds_;
+};
+
+/// A graph that exposes one row of bonds per site. PairGraph satisfies it.
+template <class G>
+concept PairGraphLike = requires(const G g, std::size_t i) {
+    typename G::bond_type;
+    { g.sites() } -> std::convertible_to<std::size_t>;
+    { g.degree(i) } -> std::convertible_to<std::size_t>;
+    { g.bonds(i) } -> std::convertible_to<const typename G::bond_type*>;
 };

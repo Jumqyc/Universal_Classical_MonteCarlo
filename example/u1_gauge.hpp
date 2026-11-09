@@ -3,22 +3,22 @@
 #include <array>
 #include <cstddef>
 
-#include <lattice/cell_list.hpp>
+#include <lattice/cell_complex.hpp>
 #include <lattice/hypercubic.hpp>
-#include <term/cell_model.hpp>
-#include <term/plaquette_term.hpp>
+#include <model/cell.hpp>
+#include <term/plaquette.hpp>
 
 /// Pure U(1) lattice gauge theory on a periodic four-dimensional lattice.
 ///
 /// Every link is one site. The model is a CellModel whose cells are the
-/// plaquettes: CellList supplies which four links form each plaquette and which
+/// plaquettes: CellComplex supplies which four links form each plaquette and which
 /// plaquettes contain a given link, and U1PlaquetteTerm supplies the Wilson
 /// energy. The action is
 ///   S = beta * sum_p (1 - cos theta_p).
 class U1Gauge
-    : public CellModel<U1Dof, U1PlaquetteTerm, CellList<4>>
+    : public CellModel<U1Dof, U1PlaquetteTerm, CellComplex<4>>
 {
-    using Base = CellModel<U1Dof, U1PlaquetteTerm, CellList<4>>;
+    using Base = CellModel<U1Dof, U1PlaquetteTerm, CellComplex<4>>;
 
 public:
     /// L is the extent in every direction; beta is the inverse coupling.
