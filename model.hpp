@@ -1,71 +1,97 @@
 #pragma once
 
+#include <algorithm>
+#include <concepts>
 #include <cstddef>
-#include <cstring>
 
-template <typename T,
-          std::size_t latt_size,
-          std::size_t dof_size>
-class Model
+/// Owning buffer for one lattice: N scalars, allocated once, moved but never
+/// copied. A model holds one of these and exposes it through data().
+template <typename T, std::size_t N>
+class Field
 {
 public:
-    using value_type                = T;
-    static constexpr std::size_t dof = dof_size;
+    Field() : data_(new T[N]) {}
+    ~Field() { delete[] data_; }
 
-    Model() // constructor
-        : field_(new T[latt_size * dof_size])
-    {}
+    Field(const Field&)            = delete;
+    Field& operator=(const Field&) = delete;
 
-    virtual ~Model() // free
+    Field(Field&& other) noexcept
+        : data_(other.data_)
     {
-        delete[] field_;
+        other.data_ = nullptr;
     }
 
-    Model(const Model&)            = delete;
-    Model& operator=(const Model&) = delete;
-
-    Model(Model&& other) noexcept
-        : field_(other.field_)
-    {
-        other.field_ = nullptr;
-    }
-
-    Model& operator=(Model&& other) noexcept
+    Field& operator=(Field&& other) noexcept
     {
         if (this != &other) {
-            delete[] field_;
-            field_     = other.field_;
-            other.field_ = nullptr;
+            delete[] data_;
+            data_       = other.data_;
+            other.data_ = nullptr;
         }
         return *this;
     }
 
+    const T* data() const noexcept { return data_; }
+    T*       data()       noexcept { return data_; }
 
-    virtual double energy_at(std::size_t loc) const = 0;
-    virtual T order_param_at(std::size_t loc) const = 0;
+private:
+    T* data_;
+};
 
-    /// Change of the total energy when self_loc takes proposal, every other site fixed.
-    virtual double energy_diff_at(std::size_t self_loc, const T *proposal) const = 0;
+/// Base for a model whose state is one field: hands out sites(), data() and
+/// the write-back the updaters need, so a concrete model only writes its
+/// energy terms. Nothing here is virtual; a model that caches local fields
+/// defines its own update(), which hides this one.
+template <typename T, std::size_t Sites, std::size_t Dof>
+class Model
+{
+public:
+    std::size_t sites() const noexcept { return Sites; }
+    const T*    data()  const noexcept { return field_.data(); }
+    T*          data()        noexcept { return field_.data(); }
 
-    /// Change of the bond energy between self_loc and other_loc when self_loc
-    /// takes proposal and other_loc keeps its value. Only that bond, not the
-    /// whole site: cluster growth must not count the other bonds twice.
-    virtual double energy_diff_between(std::size_t self_loc, std::size_t other_loc, const T *proposal) const = 0;
-
-    /// Writes the periodic neighbour indices of loc into out and returns how many.
-    /// out has room for at least max_neighbors entries.
-    virtual std::size_t neighbors(std::size_t loc, std::size_t *out) const = 0;
-
-    std::size_t sites() const noexcept { return latt_size; }
-    const T*    data() const noexcept { return field_; }
-
-    /// Writes a new value for one site. Virtual so that a model caching local
-    /// fields can keep them in step; the default only copies the bytes.
-    virtual void update(std::size_t loc,const T *proposal) noexcept {
-        std::memcpy(field_ + loc * dof_size,
-                    proposal,
-                    dof_size*sizeof(T));
+    /// Writes p into loc, leaving every other site untouched.
+    void update(std::size_t loc, const T* proposal)
+    {
+        std::copy_n(proposal, Dof, field_.data() + loc * Dof);
     }
-protected:
-    T* field_;
+
+private:
+    Field<T, Sites * Dof> field_;
+};
+
+/// What an updater needs from a model. Every member is resolved at compile
+/// time: the model stays a plain struct with no table pointer, so the same
+/// definition can be copied to a device and driven by a kernel, and a missing
+/// member is a compile error rather than a run-time surprise.
+template <class M>
+concept ModelLike = requires(const M cm, 
+                            M m, 
+                            std::size_t loc, 
+                            std::size_t* out,
+                            const typename M::value_type* proposal) {
+    typename M::value_type;
+    { M::dof }           -> std::convertible_to<std::size_t>;
+    { M::max_neighbors } -> std::convertible_to<std::size_t>;
+
+    { cm.sites() }       -> std::convertible_to<std::size_t>;
+    { cm.data() }        -> std::convertible_to<const typename M::value_type*>;
+
+    /// Neighbour indices of loc, periodic; at most max_neighbors of them.
+    { cm.neighbors(loc, out) } -> std::convertible_to<std::size_t>;
+
+    /// Total energy of one site, and its contribution to the order parameter.
+    { cm.energy_at(loc) }       -> std::convertible_to<double>;
+    { cm.order_param_at(loc) }  -> std::convertible_to<typename M::value_type>;
+
+    /// Energy change when loc takes proposal, all other sites fixed.
+    { cm.energy_diff_at(loc, proposal) } -> std::convertible_to<double>;
+
+    /// Energy change of the single bond between the two sites when the first
+    /// takes proposal and the second keeps its value.
+    { cm.energy_diff_between(loc, loc, proposal) } -> std::convertible_to<double>;
+
+    /// Writes proposal into loc; a model caching local fields updates them here.
+    { m.update(loc, proposal) } -> std::same_as<void>;
 };
